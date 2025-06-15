@@ -91,12 +91,3 @@ Check installed packages:pip list | grep -E "llama-index|sentence-transformers|t
 Resolve conflicts with a new virtual environment.
 
 
-
-Notes
-
-LLM Usage: The chatbot uses the Groq API for query and greeting classification, which may incur latency or rate limits. A keyword fallback ensures robustness.
-Chat History: Stored in memory during the session. To persist across sessions, consider adding file-based storage (e.g., JSON).
-Extending: Add feedback collection, query caching, or additional sources by modifying srilanka_chatbot.py.
-
-License
-MIT License (or specify your preferred license).
