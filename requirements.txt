@@ -8,3 +8,7 @@ llama-index-readers-wikipedia
 llama-index-tools-wikipedia
 sentence-transformers
 torch
+fastapi
+pydantic
+tools
+uvicorn
