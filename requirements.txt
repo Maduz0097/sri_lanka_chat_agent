@@ -2,13 +2,8 @@ aiohttp
 dotenv
 python-dotenv
 llama-index-core
-llama-index-embeddings-huggingface
-llama-index-llms-groq
-llama-index-readers-wikipedia
-llama-index-tools-wikipedia
-sentence-transformers
-torch
 fastapi
 pydantic
 tools
 uvicorn
+SQLAlchemy

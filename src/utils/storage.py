@@ -1,40 +1,47 @@
-import json
-import os
+from .database import ChatHistory, Feedback, get_db
 from llama_index.core.llms import ChatMessage
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import text
 from typing import List
+import logging
 
-HISTORY_FILE = "chat_history.json"
-FEEDBACK_FILE = "feedback_dataset.json"
+logger = logging.getLogger(__name__)
 
-def load_chat_history() -> List[ChatMessage]:
-    """Load chat history from file."""
+async def load_chat_history(db: AsyncSession) -> List[ChatMessage]:
+    """Load chat history from database."""
     try:
-        if os.path.exists(HISTORY_FILE):
-            with open(HISTORY_FILE, 'r') as f:
-                data = json.load(f)
-                return [ChatMessage(**msg) for msg in data]
+        result = await db.execute(
+            text("SELECT role, content FROM chat_history ORDER BY timestamp ASC")
+        )
+        rows = result.fetchall()
+        return [
+            ChatMessage(role=row[0], content=row[1])
+            for row in rows
+        ]
+    except Exception as e:
+        logger.error(f"Error loading chat history: {str(e)}")
         return []
-    except Exception as e:
-        print(f"Error loading chat history: {str(e)}")
-        return []
 
-def save_chat_history(history: List[ChatMessage]) -> None:
-    """Save chat history to file."""
+async def save_chat_history(db: AsyncSession, history: List[ChatMessage]) -> None:
+    """Save chat history to database."""
     try:
-        with open(HISTORY_FILE, 'w') as f:
-            json.dump([msg.dict() for msg in history], f, indent=2)
+        # Clear existing history to avoid duplicates
+        await db.execute(text("DELETE FROM chat_history"))
+        # Insert new history
+        for msg in history:
+            db.add(ChatHistory(role=msg.role, content=msg.content))
+        await db.commit()
     except Exception as e:
-        print(f"Error saving chat history: {str(e)}")
+        logger.error(f"Error saving chat history: {str(e)}")
+        await db.rollback()
+        raise
 
-def save_feedback(query: str, response: str, rating: str) -> None:
-    """Save user feedback to dataset."""
+async def save_feedback(db: AsyncSession, query: str, response: str, rating: str) -> None:
+    """Save feedback to database."""
     try:
-        data = []
-        if os.path.exists(FEEDBACK_FILE):
-            with open(FEEDBACK_FILE, 'r') as f:
-                data = json.load(f)
-        data.append({"query": query, "response": response, "rating": rating})
-        with open(FEEDBACK_FILE, 'w') as f:
-            json.dump(data, f, indent=2)
+        db.add(Feedback(query=query, response=response, rating=rating))
+        await db.commit()
     except Exception as e:
-        print(f"Error saving feedback: {str(e)}")
+        logger.error(f"Error saving feedback: {str(e)}")
+        await db.rollback()
+        raise
