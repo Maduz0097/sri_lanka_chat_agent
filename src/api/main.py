@@ -9,9 +9,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from dotenv import load_dotenv
 import os
 from typing import Optional
+from openinference.instrumentation.llama_index import LlamaIndexInstrumentor
+from phoenix.otel import register
+
 
 # Load environment variables
 load_dotenv()
+
+tracer_provider = register(
+  project_name="default",
+  endpoint="http://localhost:6006/v1/traces",
+  auto_instrument=True
+)
+LlamaIndexInstrumentor().instrument(tracer_provider=tracer_provider)
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -45,7 +55,7 @@ async def chat(request: ChatRequest, db: AsyncSession = Depends(get_db), agent=D
     if not request.query.strip():
         raise HTTPException(status_code=400, detail="Query cannot be empty")
 
-    response, is_greeting, is_sri_lanka = await handle_query(request.query, agent=agent)
+    response, is_greeting, is_sri_lanka = await handle_query(request.query, agent=agent,db=db)
 
     # Update chat history
     agent.chat_history.append(ChatMessage(role="user", content=request.query))
