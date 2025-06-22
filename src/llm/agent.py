@@ -3,12 +3,22 @@ from llama_index.llms.groq import Groq
 from llama_index.core.agent import ReActAgent
 from llama_index.core.llms import ChatMessage
 from llama_index.core.memory import ChatMemoryBuffer
+from llama_index.core import Settings
+from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from .tools import wikipedia_search, rag_search
 from ..utils.storage import load_chat_history
 from ..utils.database import AsyncSession, get_db
+from opentelemetry import trace
 from typing import List
+import logging
 import os
 from dotenv import load_dotenv
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+tracer = trace.get_tracer(__name__)
+
 
 # Load environment variables
 load_dotenv()
@@ -45,11 +55,38 @@ class CustomReActAgent(ReActAgent):
         self._chat_history = history
 
 async def init_agent(db: AsyncSession) -> CustomReActAgent:
-    """Initialize the agent with chat history from the database."""
-    chat_history = await load_chat_history(db)
-    return CustomReActAgent(
-        tools=tools,
-        llm=llm,
-        chat_history=chat_history,
-        verbose=True
-    )
+    """Initialize the agent with chat history from the database and local embeddings."""
+    with tracer.start_as_current_span("init_agent"):
+        try:
+            # Set local embedding model
+            with tracer.start_as_current_span("initialize_embeddings"):
+                Settings.embed_model = HuggingFaceEmbedding(
+                    model_name="sentence-transformers/all-MiniLM-L6-v2",
+                    cache_folder="D:\\agentic\\simple_agent\\models"
+                )
+                Settings.llm = llm
+                logger.info("Initialized HuggingFaceEmbedding (all-MiniLM-L6-v2) for agent")
+
+            # Verify embedding model
+            if not isinstance(Settings.embed_model, HuggingFaceEmbedding):
+                logger.error("Invalid embedding model detected: %s", type(Settings.embed_model))
+                raise ValueError("Only HuggingFaceEmbedding is allowed")
+
+            # Load chat history
+            with tracer.start_as_current_span("load_chat_history"):
+                chat_history = await load_chat_history(db)
+                logger.info("Loaded %d chat history messages", len(chat_history))
+
+            # Initialize agent
+            agent = CustomReActAgent(
+                tools=tools,
+                llm=llm,
+                chat_history=chat_history,
+                verbose=True
+            )
+            logger.info("CustomReActAgent initialized successfully")
+            return agent
+        except Exception as e:
+            logger.error("Failed to initialize agent: %s", str(e))
+            tracer.get_current_span().record_exception(e)
+            raise
