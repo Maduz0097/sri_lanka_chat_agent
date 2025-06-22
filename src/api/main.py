@@ -9,9 +9,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from dotenv import load_dotenv
 import os
 from typing import Optional
+from openinference.instrumentation.llama_index import LlamaIndexInstrumentor
+from phoenix.otel import register
+
 
 # Load environment variables
 load_dotenv()
+
+tracer_provider = register(
+  project_name="default",
+  endpoint="http://localhost:6006/v1/traces",
+  auto_instrument=True
+)
+LlamaIndexInstrumentor().instrument(tracer_provider=tracer_provider)
 
 # Initialize FastAPI app
 app = FastAPI(
