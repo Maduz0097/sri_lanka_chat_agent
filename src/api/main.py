@@ -55,7 +55,7 @@ async def chat(request: ChatRequest, db: AsyncSession = Depends(get_db), agent=D
     if not request.query.strip():
         raise HTTPException(status_code=400, detail="Query cannot be empty")
 
-    response, is_greeting, is_sri_lanka = await handle_query(request.query, agent=agent)
+    response, is_greeting, is_sri_lanka = await handle_query(request.query, agent=agent,db=db)
 
     # Update chat history
     agent.chat_history.append(ChatMessage(role="user", content=request.query))
